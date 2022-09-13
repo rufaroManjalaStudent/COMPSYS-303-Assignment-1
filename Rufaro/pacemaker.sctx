@@ -1,0 +1,76 @@
+scchart pacemaker {
+  //Interfacing signals
+  input signal A, V
+  output signal Vout, Aout
+  
+  //Internal signals
+  input signal VRP, PVARP, URI, LRI, AVI
+  
+  //imported values
+  
+//==Ventricle REGION== This will handle outputs
+  region Ventricle{
+    initial state Waiting
+    if VRP& !V & URI & AVI do Vout go to Induced
+    if VRP & V & URI do Vout go to Natural
+    state Induced
+    if Vout go to Waiting
+    state Natural
+    if Vout go to Waiting
+    
+  } // end of Ventricle region 
+ 
+  
+//==VRP REGION== 
+  region VRP {
+    clock c
+    initial state Blocking{}
+    if c >= `VRP_TIME` do VRP go to Unblocking  //is this output persistent while I am in state 
+    state Unblocking{
+      during do VRP
+    }
+    if Vout do c=0 go to Blocking
+  }//end of VRP region
+    
+//==PVARP REGION==    
+  region PVARP{
+    clock c
+    initial state Blocking{}
+    if c >= `PVARP_TIME` do PVARP go to Elapsed  //is this output persistent while I am in state
+    if Vout do c=0 go to Blocking
+    state Elapsed{
+      during do PVARP
+    }
+    if Vout do c=0 go to Blocking    
+  } // end of PVARP region
+  
+//==URI REGION==    
+  region URI{
+   clock c
+   initial state Timing{}
+   if c >= `URI_TIME` do URI go to Unblocking  //is this output persistent while I am in state 
+   if Vout do c=0 go to Timing
+   state Unblocking{
+     during do URI
+    }
+   if Vout do c=0 go to Timing 
+  } // end of URI region
+
+//==LRI REGION==    
+  region LRI{
+    clock c
+    initial state Blocking{}
+    if c >= `LRI_TIME` do LRI go to Unblocking  //is this output persistent while I am in state 
+    state Unblocking{
+      during do LRI
+    }
+    if Vout do c=0 go to Blocking    
+  } // end of LRI region
+    
+ 
+ 
+ 
+ 
+ 
+ 
+ }//end of scchart 
