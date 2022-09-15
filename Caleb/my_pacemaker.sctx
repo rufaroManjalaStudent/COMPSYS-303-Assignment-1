@@ -1,0 +1,133 @@
+scchart Pacemaker {
+  // Interfacing signals
+  input signal A, V
+  output signal VP, AP
+  bool AP_On, VP_On // AR and VR ignore
+  bool VRP_On, PVARP_On, URI_On, LRI_On, AVI_On, AEI_On
+  // Internal signals
+  //signal VRP, PVARP, URI, LRI, AVI, AEI
+
+  region AVI {
+    clock c
+
+    initial state waitAndReset { // Resets clock for AVI Region, then waits for enable from AEI
+      entry do c = 0
+      entry do AEI_On = true
+    }
+    if AVI_On == true && (A || AP) == true go to Counting_AVI
+
+    state Counting_AVI {
+      during do c++
+    }
+    if c >= `AVI_TIME` && !V && VP_On do VP; AVI_On = false go to waitAndReset // send a pulse
+    if V && VP_On do AVI_On = false go to waitAndReset // if pulse is detected
+  }
+
+//---------------------  
+//#####################  
+  region AEI {
+    clock c
+
+    initial state waitAndReset {
+      entry do c = 0
+      entry do AVI_On = true
+    }
+    if AEI_On == true && (V || VP) == true go to Counting_AEI
+
+    state Counting_AEI {
+      during do c++
+    }
+    if c >= `AEI_TIME` && !A && AP_On do AP; AEI_On = false go to waitAndReset
+    if A && AP_On do AEI_On = false go to waitAndReset
+  }
+
+//---------------------   
+//##################### 
+  region LRI {
+    clock c
+
+    initial state waitAndReset {
+      entry do c = 0
+      entry do AVI_On = true
+    }
+    if (V || VP) && VRP_On == false go to Counting_LRI // start counting when Ventricular event happens
+
+    state Counting_LRI { //
+      during do c++
+    }
+    if c >= `LRI_TIME` do VP go to waitAndReset
+    if V || VP go to waitAndReset
+  }
+
+//---------------------    
+//#####################
+  region URI {
+    clock c
+
+    initial state waitAndReset {
+      entry do c = 0
+      entry do AVI_On = true
+    }
+    if (V || VP) && VRP_On == false go to Counting_URI // start counting when Ventricular event happens
+
+    state Counting_URI { //
+      during do c++
+    }
+    if c >= `URI_TIME` do VP go to waitAndReset
+    if V || VP go to waitAndReset
+  }
+
+//---------------------   
+//#####################  
+  region PVARP {
+    clock c
+
+    initial state waitAndReset {
+      entry do c = 0
+      entry do AP_On = false
+    }
+    if (A || AP) do AP_On = true go to Counting_PVARP
+
+    state Counting_PVARP {
+      during do c++
+    }
+    if c >= `PVARP_TIME` go to waitAndReset
+  }
+
+//---------------------  
+//#####################  
+  region VRP {
+    clock c
+
+    initial state waitAndReset {
+      entry do c = 0
+      entry do VP_On = false
+    }
+    if (V || VP) do VP_On = true go to Counting_VRP
+
+    state Counting_VRP {
+      during do c++
+    }
+    if c >= `VRP_TIME` go to waitAndReset
+  }
+  
+
+//---------------------  
+} // END OF PACEMAKER
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
