@@ -18,16 +18,25 @@ scchart DDD_Pacemaker {
   region AEI { // DEADLINE: Pace the atrium if AEI_Time is exceeded.
     clock c = 0
 
-    initial state WAR {
+    initial state init
+    if  VS || VP go to WAR
+
+    state WAR {
       entry do c = 0
     }
-    if PVARP == false && (AS || AP) go to WAR
-    if c >= AEI_TIME && !AS && URI == false go to sendPulse_Atrial
+
+    if c >= AEI_TIME && AS == false && URI == false go to sendPulse_Atrial
+    if c>= LRI_TIME  && AS == false go to sendPulse_Atrial
+
+   if PVARP == false && (AS) go to waitForPulse
+
+    state waitForPulse
+    if VS||VP go to WAR
 
     state sendPulse_Atrial {
       entry do AP
     }
-    go to WAR
+    go to waitForPulse
   }
 
 //---------------------  
@@ -35,16 +44,28 @@ scchart DDD_Pacemaker {
   region AVI {
     clock c = 0
 
-    initial state WAR { // waitAndReset
+    initial state init 
+    if AS||AP go to WAR
+
+
+    state WAR { // waitAndReset
       entry do c = 0
     }
-    if VRP == false && (VS || VP) go to WAR
-    if c >= AVI_TIME_OUT && !VS && URI == false go to sendPulse_Ventricle
+     if VRP == false && (VS) go to waitForPulse
+    if c >= AVI_TIME_OUT && VS == false && URI == false go to sendPulse_Ventricle
+    if c>= LRI_TIME  && VS == false go to sendPulse_Ventricle
+
+    
+    state waitForPulse{
+      
+    }
+    if AS||AP go to WAR
+     
 
     state sendPulse_Ventricle {
       entry do VP
     }
-    go to WAR
+    go to waitForPulse
   }
 
 //---------------------  
@@ -81,30 +102,33 @@ scchart DDD_Pacemaker {
   region URI {
     clock c = 0
 
-    initial state wait {
+    initial state WAR {
       during do URI
+       entry do c = 0
     }
-    if c >= URI_TIME || VS || VP go to Reset
+    if c >= URI_TIME || (VS || VP)  go to Reset
 
     state Reset {
-      entry do c = 0
+     // entry do c = 0
     }
-    go to wait
+    if VS|| VP go to WAR
   }
+
 ////--------------------- 
 //##################### 
   region LRI {
     clock c = 0
 
-    initial state wait {
+    initial state WAR {
+      entry do c = 0
       during do LRI
     }
-    if c >= LRI_TIME || VS || VP go to Reset
+    if c >= LRI_TIME || (VS || VP) go to Reset
 
     state Reset {
-      entry do c = 0
+      //entry do c = 0
     }
-    go to wait
+    if VS|| VP go to WAR
   }
 //--------------------- 
 }
