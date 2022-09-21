@@ -1,0 +1,125 @@
+#resource "timing.h"
+#hostcode-c "#include \"timing.h\""
+@ClocksUseSD
+// Putting all the regions together
+scchart DDD_Pacemaker {
+  input signal AS, VS
+  output signal VRP, PVARP, URI, LRI
+  output signal test
+  output signal VP, AP // V_Paced, A_Paced
+  // Required in order to use values from timing.h 
+  host "int" AEI_TIME = `AEI_VALUE`
+  host "int" VRP_TIME = `VRP_VALUE`
+  host "int" AVI_TIME_OUT = `AVI_VALUE`
+  host "int" PVARP_TIME = `PVARP_VALUE`
+  host "int" URI_TIME= `URI_VALUE`
+  host "int" LRI_TIME= `LRI_VALUE`
+
+//#####################  
+  region AEI { // DEADLINE: Pace the atrium if AEI_Time is exceeded.
+    clock c = 0
+
+    initial state init // Initial state to help settle for online testing
+    if  VS || VP go to CAR // CAR = Count And Reset
+
+    state CAR { // Waits here till clock 
+      entry do c = 0
+    }
+    if c >= AEI_TIME && AS == false && URI == false go to sendPulse_Atrial // send pulse when no natural atrial pulse and deadline has been exceeded
+    if c >= LRI_TIME && AS == false go to sendPulse_Atrial //
+    if PVARP == false && VRP == false && (AS) go to waitForPulse
+
+    state waitForPulse // Waits here for a Ventricular event
+    if VS||VP go to CAR
+
+    state sendPulse_Atrial {
+      entry do AP
+    }
+    go to waitForPulse // after pacing the atrium, wait for next ventricular event, then reset
+  }
+
+//---------------------  
+//#####################  
+  region AVI { // DEADLINE: Pace the ventricle if AVI_TIME is exceeded (and extend if URI hasn't elapsed)
+    clock c = 0
+
+    initial state init // Initial state to help settle for online testing
+    if AS||AP go to CAR
+
+    state CAR { // Count and Reset
+      entry do c = 0
+    }
+    if c >= AVI_TIME_OUT && VS == false && URI == false go to sendPulse_Ventricle
+    if c>= LRI_TIME  && VS == false go to sendPulse_Ventricle
+    if VRP == false && PVARP == false && (VS) go to waitForPulse
+
+    state waitForPulse { // Waits here till there is an Atrial event (otherwise states will sync up and pace simultaneously)
+    }
+    if AS||AP go to CAR
+
+    state sendPulse_Ventricle {
+      entry do VP
+    }
+    go to waitForPulse
+  }
+
+//---------------------  
+//#####################  
+  region VRP {
+    clock c = 0
+
+    initial state TimeOutAndReset {
+      entry do c = 0
+      during do VRP // During clock time is less than timeout, VRP == TRUE (Ignore pulse i.e. AR)
+    }
+    if c >= VRP_TIME go to waitForPulse
+
+    state waitForPulse // Waits for pulse (V_Nat or V_Pace) detected, go to reset.
+    if VS || VP go to TimeOutAndReset
+  }
+
+//#####################  
+  region PVARP {
+    clock c = 0
+
+    initial state TimeOutAndReset {
+      entry do c = 0
+      during do PVARP // While in this state, PVARP output signal is TRUE (ignoring pulses that occur during this time (Refactory).
+    }
+    if c >= PVARP_TIME go to waitForPulse
+
+    state waitForPulse // Waits for pulse (V_Nat or V_Pace) detected, go to reset.
+    if VS || VP go to TimeOutAndReset
+  }
+
+//---------------------  
+//#####################   
+  region URI { // Maximum heart rate we are allowed to pace at (time between 2 ventricular events)
+    clock c = 0
+
+    initial state CAR { // Count And Reset
+      during do URI
+      entry do c = 0
+    }
+    if c >= URI_TIME && (!PVARP  && !VRP && (VS || VP))  go to waitForPulse
+
+    state waitForPulse // Waits here till a ventricular event occurs before resetting.
+    if VS|| VP go to CAR
+  }
+
+//--------------------- 
+//##################### 
+  region LRI { // Minimum heart rate we are allowed to pace at
+    clock c = 0
+
+    initial state CAR {
+      entry do c = 0
+      during do LRI
+    }
+    if c >= LRI_TIME && (!PVARP  && !VRP) && (VS)  go to waitForPulse
+
+    state waitForPulse // Waits here till a ventricular event occurs before resetting.
+    if VS|| VP go to CAR
+  }
+//--------------------- 
+}
